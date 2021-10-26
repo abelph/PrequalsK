@@ -14,7 +14,7 @@ repositories {
 
 
 dependencies {
-    implementation(files("./lib/kotlin-grammar-tools-0.1-43.jar"))
+    implementation(files("./lib/kotlin-grammar-parser-0.1.jar"))
     testImplementation(kotlin("test"))
 }
 
