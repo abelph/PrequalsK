@@ -5,14 +5,16 @@ plugins {
     application
 }
 
-group = "me.david"
+group = "io.github.abelph"
 version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
 }
 
+
 dependencies {
+    implementation(files("./lib/kotlin-grammar-tools-0.1-43.jar"))
     testImplementation(kotlin("test"))
 }
 
@@ -21,7 +23,7 @@ tasks.test {
 }
 
 tasks.withType<KotlinCompile>() {
-    kotlinOptions.jvmTarget = "11"
+    kotlinOptions.jvmTarget = "16"
 }
 
 application {
