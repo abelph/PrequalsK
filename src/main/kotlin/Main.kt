@@ -43,11 +43,14 @@ fun preprocessKotlinJUnitToXCUnit(kotlinSource: String): String {
 
 class PreprocessorListener(private val parser: KotlinParser, private val tokens: TokenStream) : KotlinParserBaseListener() {
     private val outputTokens = ArrayList<String>()
+    private var savedTokenSize = 0
     private var printedParent: ParserRuleContext? = null
     private var lastContext: ParserRuleContext? = null
     private var lastRuleStart = 0
 
     private var tryStartPrinting = false;
+
+    private var skipToClassBody = false;
 
     fun getOutput(): String {
         return outputTokens.joinToString(separator = "")
@@ -63,14 +66,26 @@ class PreprocessorListener(private val parser: KotlinParser, private val tokens:
         tryStartPrinting = true // Handled in next call to "exitEveryRule"
     }
 
-    fun undo() {
-        while (outputTokens.size != lastRuleStart) {
+    fun removeTokensStartingAtIndex(i: Int) {
+        while (outputTokens.size != i) {
             outputTokens.removeLast()
         }
     }
 
+    fun undo() {
+        removeTokensStartingAtIndex(lastRuleStart)
+    }
+
     fun ignore() {
         undo()
+    }
+
+    fun saveCheckpoint() {
+        savedTokenSize = outputTokens.size
+    }
+
+    fun restoreCheckpoint() {
+        removeTokensStartingAtIndex(savedTokenSize)
     }
 
 //    override fun visitTerminal(p0: TerminalNode?) {
@@ -79,14 +94,22 @@ class PreprocessorListener(private val parser: KotlinParser, private val tokens:
 //    override fun visitErrorNode(p0: ErrorNode?) {
 //    }
 
+    fun saveTokens(context: ParserRuleContext) {
+        saveTokens(context, context)
+    }
+
+    fun saveTokens(startContext: ParserRuleContext, stopContext: ParserRuleContext) {
+        for (i in startContext.start.tokenIndex..stopContext.stop.tokenIndex) {
+            outputTokens.add(tokens.get(i).text)
+        }
+    }
+
     override fun enterEveryRule(p0: ParserRuleContext?) {
         lastContext = p0
         lastRuleStart = outputTokens.size
         if (printedParent == null && p0 != null && p0.stop != null) {
             println(p0.toString(parser))
-            for (i in p0.start.tokenIndex..p0.stop.tokenIndex) {
-                outputTokens.add(tokens.get(i).text)
-            }
+            saveTokens(p0, p0)
         }
     }
 
@@ -125,8 +148,94 @@ class PreprocessorListener(private val parser: KotlinParser, private val tokens:
         ignore()
     }
 
-    override fun enterClassDeclaration(ctx: KotlinParser.ClassDeclarationContext?) { stopPrinting() }
+    override fun enterClassDeclaration(ctx: KotlinParser.ClassDeclarationContext?) {
+        if (ctx != null) {
+            if (ctx.simpleIdentifier().text.endsWith("Test")) {
+                ignore()
+                var startContext: ParserRuleContext = ctx.simpleIdentifier()
+                var stopContext: ParserRuleContext = startContext
+                if (ctx.modifiers() != null) {
+                    startContext = ctx.modifiers()
+                } else {
+                    if (ctx.CLASS() != null) {
+                        outputTokens.add(ctx.CLASS().text + " ")
+                    }
+                    if (ctx.FUN() != null) {
+                        outputTokens.add(ctx.FUN().text + " ")
+                    }
+                    if (ctx.INTERFACE() != null) {
+                        outputTokens.add(ctx.INTERFACE().text + " ")
+                    }
+                }
+                if (ctx.typeParameters() != null) {
+                    stopContext = ctx.typeParameters()
+                }
+                if (ctx.primaryConstructor() != null) {
+                    stopContext = ctx.primaryConstructor()
+                }
+                saveTokens(startContext, stopContext)
+
+                if (ctx.delegationSpecifiers() != null) {
+                    outputTokens.add(": ")
+                    saveTokens(ctx.delegationSpecifiers())
+                    outputTokens.add(", XCTestCase ")
+                } else {
+                    outputTokens.add(": XCTestCase ")
+                }
+                if (ctx.typeConstraints() != null) {
+                    saveTokens(ctx.typeConstraints())
+                }
+                saveCheckpoint()
+                skipToClassBody = true
+            } else {
+                stopPrinting()
+            }
+        }
+    }
     override fun exitClassDeclaration(ctx: KotlinParser.ClassDeclarationContext?) { startPrinting() }
+
+    override fun enterModifiers(ctx: KotlinParser.ModifiersContext?) { stopPrinting() }
+    override fun exitModifiers(ctx: KotlinParser.ModifiersContext?) { startPrinting() }
+
+    override fun enterSimpleIdentifier(ctx: KotlinParser.SimpleIdentifierContext?) { stopPrinting() }
+    override fun exitSimpleIdentifier(ctx: KotlinParser.SimpleIdentifierContext?) { startPrinting() }
+
+    override fun enterTypeParameters(ctx: KotlinParser.TypeParametersContext?) { stopPrinting() }
+    override fun exitTypeParameters(ctx: KotlinParser.TypeParametersContext?) { startPrinting() }
+
+    override fun enterPrimaryConstructor(ctx: KotlinParser.PrimaryConstructorContext?) { stopPrinting() }
+    override fun exitPrimaryConstructor(ctx: KotlinParser.PrimaryConstructorContext?) { startPrinting() }
+
+    override fun enterDelegationSpecifiers(ctx: KotlinParser.DelegationSpecifiersContext?) { stopPrinting() }
+    override fun exitDelegationSpecifiers(ctx: KotlinParser.DelegationSpecifiersContext?) { startPrinting() }
+
+    override fun enterTypeConstraints(ctx: KotlinParser.TypeConstraintsContext?) { stopPrinting() }
+    override fun exitTypeConstraints(ctx: KotlinParser.TypeConstraintsContext?) { startPrinting() }
+
+    override fun enterClassBody(ctx: KotlinParser.ClassBodyContext?) {
+        if (ctx != null) {
+            if (skipToClassBody) {
+                restoreCheckpoint()
+                saveTokens(ctx)
+                skipToClassBody = false
+            }
+            stopPrinting()
+        }
+    }
+    override fun exitClassBody(ctx: KotlinParser.ClassBodyContext?) { startPrinting() }
+
+    override fun enterEnumClassBody(ctx: KotlinParser.EnumClassBodyContext?) {
+        if (ctx != null) {
+            if (skipToClassBody) {
+                restoreCheckpoint()
+                saveTokens(ctx)
+                skipToClassBody = false
+            }
+            stopPrinting()
+        }
+    }
+    override fun exitEnumClassBody(ctx: KotlinParser.EnumClassBodyContext?) { startPrinting() }
+
 
     override fun enterObjectDeclaration(ctx: KotlinParser.ObjectDeclarationContext?) { stopPrinting() }
     override fun exitObjectDeclaration(ctx: KotlinParser.ObjectDeclarationContext?) { startPrinting() }
@@ -139,13 +248,5 @@ class PreprocessorListener(private val parser: KotlinParser, private val tokens:
 
     override fun enterTypeAlias(ctx: KotlinParser.TypeAliasContext?) { stopPrinting() }
     override fun exitTypeAlias(ctx: KotlinParser.TypeAliasContext?) { startPrinting() }
-
-//    override fun enterClassDeclaration(p0: KotlinParser.ClassDeclarationContext?) {
-//        stopPrinting()
-//    }
-//
-//    override fun exitClassDeclaration(p0: KotlinParser.ClassDeclarationContext?) {
-//        startPrinting()
-//    }
 
 }
