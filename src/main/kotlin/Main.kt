@@ -579,8 +579,12 @@ override fun exitClassBody(ctx: KotlinParser.ClassBodyContext?) {
                 && pe.simpleIdentifier() != null
                 && pe.simpleIdentifier().text == "assertEquals") {
 
-                outputTokens.add("XCTAssertEqual")
-                saveTokens(suffixes.get(0))
+                outputTokens.add("XCTAssertEqual(")
+                val valArgs = suffixes.get(0).callSuffix().valueArguments()
+                saveTokens(valArgs.valueArgument(1))
+                outputTokens.add(", ")
+                saveTokens(valArgs.valueArgument(0))
+                outputTokens.add(")")
             } else {
                 saveTokens(ctx)
             }
