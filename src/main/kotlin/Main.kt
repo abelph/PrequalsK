@@ -113,7 +113,7 @@ class PreprocessorListener(private val parser: KotlinParser, private val tokens:
         lastContext = p0
         lastRuleStart = outputTokens.size
         if (isPrinting() && p0 != null && p0.stop != null) {
-//            println(p0.toString(parser))
+            println(p0.toString(parser))
             saveTokens(p0, p0)
         }
     }
@@ -240,7 +240,7 @@ class PreprocessorListener(private val parser: KotlinParser, private val tokens:
             }
         }
     }
-    override fun exitClassBody(ctx: KotlinParser.ClassBodyContext?) {
+override fun exitClassBody(ctx: KotlinParser.ClassBodyContext?) {
         if (isPrinting()) {
             outputTokens.add("}")
         }
@@ -353,12 +353,253 @@ class PreprocessorListener(private val parser: KotlinParser, private val tokens:
     override fun enterType(ctx: KotlinParser.TypeContext?) { stopPrinting() }
     override fun exitType(ctx: KotlinParser.TypeContext?) { startPrinting() }
 
+    private fun printBlock(ctx: KotlinParser.BlockContext?) {
+        if (ctx != null) {
+            outputTokens.add("{\n")
+            printStatements(ctx.statements())
+            outputTokens.add("}")
+        }
+    }
+
+    private fun printStatements(ctx: KotlinParser.StatementsContext?) {
+        if (ctx != null) {
+            for (statement in ctx.statement()) {
+                printStatement(statement)
+                outputTokens.add("\n")
+            }
+        }
+    }
+
+    private fun printStatement(ctx: KotlinParser.StatementContext?) {
+        if (ctx != null) {
+            if (ctx.expression() == null) {
+                saveTokens(ctx)
+            } else {
+                for (label in ctx.label()) {
+                    saveTokens(label)
+                    outputTokens.add(" ")
+                }
+                for (annotation in ctx.annotation()) {
+                    saveTokens(annotation)
+                    outputTokens.add(" ")
+                }
+                printExpression(ctx.expression())
+            }
+        }
+    }
+
+    private fun printExpression(ctx: KotlinParser.ExpressionContext?) {
+        printDisjunction(ctx?.disjunction())
+    }
+
+    private fun printDisjunction(ctx: KotlinParser.DisjunctionContext?) {
+        if (ctx != null) {
+            var printedAny = false
+            for (conjunction in ctx.conjunction()) {
+                if (printedAny) {
+                    outputTokens.add(" || ")
+                }
+                printConjunction(conjunction)
+                printedAny = true
+            }
+        }
+    }
+
+    private fun printConjunction(ctx: KotlinParser.ConjunctionContext?) {
+        if (ctx != null) {
+            var printedAny = false
+            for (equality in ctx.equality()) {
+                if (printedAny) {
+                    outputTokens.add(" && ")
+                }
+                printEquality(equality)
+                printedAny = true
+            }
+        }
+    }
+
+    private fun printEquality(ctx: KotlinParser.EqualityContext?) {
+        if (ctx != null) {
+            val comparisons = ctx.comparison()
+            val equalityOperators = ctx.equalityOperator()
+            printComparison(comparisons.get(0))
+            var i = 1
+            while (i < comparisons.size) {
+                saveTokens(equalityOperators.get(i - 1))
+                printComparison(comparisons.get(i))
+                i++
+            }
+        }
+    }
+
+    private fun printComparison(ctx: KotlinParser.ComparisonContext?) {
+        if (ctx != null) {
+            val genericCallLikeComparisons = ctx.genericCallLikeComparison()
+            val comparisonOperators = ctx.comparisonOperator()
+            printGenericCallLikeComparison(genericCallLikeComparisons.get(0))
+            var i = 1
+            while (i < genericCallLikeComparisons.size) {
+                saveTokens(comparisonOperators.get(i - 1))
+                printGenericCallLikeComparison(genericCallLikeComparisons.get(i))
+                i++
+            }
+        }
+    }
+
+    private fun printGenericCallLikeComparison(ctx: KotlinParser.GenericCallLikeComparisonContext?) {
+        if (ctx != null) {
+            printInfixOperation(ctx.infixOperation())
+            if (ctx.callSuffix() != null) {
+                for (cs in ctx.callSuffix()) {
+                    saveTokens(cs)
+                }
+            }
+        }
+    }
+
+    private fun printInfixOperation(ctx: KotlinParser.InfixOperationContext?) {
+        if (ctx != null) {
+            val elvisExpressions = ctx.elvisExpression()
+            val inOperators = ctx.inOperator()
+            printElvisExpression(elvisExpressions.get(0))
+            var i = 1
+            while (i < elvisExpressions.size) {
+                saveTokens(inOperators.get(i - 1))
+                printElvisExpression(elvisExpressions.get(i))
+                i++
+            }
+            i = 0
+            val isOperators = ctx.isOperator()
+            val types = ctx.type()
+            while (i < isOperators.size) {
+                saveTokens(isOperators.get(i), types.get(i))
+                i++
+            }
+        }
+    }
+
+    private fun printElvisExpression(ctx: KotlinParser.ElvisExpressionContext?) {
+        if (ctx != null) {
+            val infixFunctionCalls = ctx.infixFunctionCall()
+            val elvises = ctx.elvis()
+            printInfixFunctionCall(infixFunctionCalls.get(0))
+            var i = 1
+            while (i < infixFunctionCalls.size) {
+                saveTokens(elvises.get(i - 1))
+                printInfixFunctionCall(infixFunctionCalls.get(i))
+                i++
+            }
+        }
+    }
+
+    private fun printInfixFunctionCall(ctx: KotlinParser.InfixFunctionCallContext?) {
+        if (ctx != null) {
+            val rangeExpressions = ctx.rangeExpression()
+            val simpleIdentifiers = ctx.simpleIdentifier()
+            printRangeExpression(rangeExpressions.get(0))
+            var i = 1
+            while (i < rangeExpressions.size) {
+                saveTokens(simpleIdentifiers.get(i - 1))
+                printRangeExpression(rangeExpressions.get(i))
+                i++
+            }
+        }
+    }
+
+    private fun printRangeExpression(ctx: KotlinParser.RangeExpressionContext?) {
+        if (ctx != null) {
+            val additiveExpressions = ctx.additiveExpression()
+            printAdditiveExpression(additiveExpressions.get(0))
+            var i = 1
+            while (i < additiveExpressions.size) {
+                outputTokens.add("..")
+                printAdditiveExpression(additiveExpressions.get(i))
+                i++
+            }
+        }
+    }
+
+    private fun printAdditiveExpression(ctx: KotlinParser.AdditiveExpressionContext?) {
+        if (ctx != null) {
+            val multiplicativeExpressions = ctx.multiplicativeExpression()
+            val additiveOperators = ctx.additiveOperator()
+            printMultiplicativeExpression(multiplicativeExpressions.get(0))
+            var i = 1
+            while (i < multiplicativeExpressions.size) {
+                saveTokens(additiveOperators.get(i - 1))
+                printMultiplicativeExpression(multiplicativeExpressions.get(i))
+                i++
+            }
+        }
+    }
+
+    private fun printMultiplicativeExpression(ctx: KotlinParser.MultiplicativeExpressionContext?) {
+        if (ctx != null) {
+            val asExpressions = ctx.asExpression()
+            val multiplicativeOperators = ctx.multiplicativeOperator()
+            printAsExpression(asExpressions.get(0))
+            var i = 1
+            while (i < asExpressions.size) {
+                saveTokens(multiplicativeOperators.get(i - 1))
+                printAsExpression(asExpressions.get(i))
+                i++
+            }
+        }
+    }
+
+    private fun printAsExpression(ctx: KotlinParser.AsExpressionContext?) {
+        if (ctx != null) {
+            printPrefixUnaryExpression(ctx.prefixUnaryExpression())
+            val asOperators = ctx.asOperator()
+            val types = ctx.type()
+            var i = 0
+            while (i < asOperators.size) {
+                saveTokens(asOperators.get(i), types.get(i))
+                i++
+            }
+        }
+    }
+
+    private fun printPrefixUnaryExpression(ctx: KotlinParser.PrefixUnaryExpressionContext?) {
+        if (ctx != null) {
+            for (unaryPrefix in ctx.unaryPrefix()) {
+                saveTokens(unaryPrefix)
+            }
+            printPostfixUnaryExpression(ctx.postfixUnaryExpression())
+        }
+    }
+
+    private fun printPostfixUnaryExpression(ctx: KotlinParser.PostfixUnaryExpressionContext?) {
+        if (ctx != null) {
+            val pe = ctx.primaryExpression()
+            val suffixes = ctx.postfixUnarySuffix()
+            if (suffixes != null
+                && suffixes.size == 1
+                && suffixes.get(0).callSuffix() != null
+                && pe.simpleIdentifier() != null
+                && pe.simpleIdentifier().text == "assertEquals") {
+
+                outputTokens.add("XCTAssertEqual")
+                saveTokens(suffixes.get(0))
+            } else {
+                saveTokens(ctx)
+            }
+        }
+    }
+
     override fun enterFunctionBody(ctx: KotlinParser.FunctionBodyContext?) {
         if (ctx != null && isPrinting()) {
             if (skipToFunctionBody) {
                 restoreCheckpoint()
-                saveTokens(ctx)
                 skipToFunctionBody = false
+            } else {
+                ignore()
+            }
+            if (ctx.block() != null) {
+                printBlock(ctx.block())
+            } else {
+                outputTokens.add(" = ")
+                printExpression(ctx.expression())
             }
             stopPrinting()
         }
