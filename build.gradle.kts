@@ -14,6 +14,8 @@ repositories {
 
 
 dependencies {
+    implementation("io.ktor:ktor-client-core:1.6.5")
+    implementation("io.ktor:ktor-client-cio:1.6.5")
     implementation(files("./lib/kotlin-grammar-parser-0.1.jar"))
     testImplementation(kotlin("test"))
 }

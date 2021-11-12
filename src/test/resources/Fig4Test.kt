@@ -2,7 +2,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class Fig4(var s: String) {
-    fun greet(@argLabel(" ") person: String, @argLabel("from") hometown: String): String {
+    fun greet(@argLabel("_") person: String, @argLabel("from") hometown: String): String {
         s = "Hello ${person}!\n"
         s += "Glad you could visit from ${hometown}."
         return s

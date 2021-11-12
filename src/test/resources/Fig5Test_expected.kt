@@ -4,16 +4,16 @@ import kotlin.test.assertEquals
 class C2 {
     var s: String = ""
     var x: Int = 0
-        set(newValue) {
+        set(ᏫnewValue) {
             s = "old: ${field}\n"
-            field = newValue
+            field = ᏫnewValue
             s += "new: ${field}"
         }
 }
 
 class Fig5Test: XCTestCase {
 
-    fun testFig5Value42() {
+    fun testFig5Value42(){
         val c = C2()
         c.x = 42
         val expected = "old: 0\nnew: 42"

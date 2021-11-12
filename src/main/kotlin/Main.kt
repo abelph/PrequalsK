@@ -1,3 +1,10 @@
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import kotlinx.coroutines.runBlocking
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.ParserRuleContext
@@ -9,28 +16,54 @@ import org.jetbrains.kotlin.spec.grammar.KotlinParserBaseListener
 import java.io.File
 
 fun main(args: Array<String>) {
-    preprocessKotlinJUnitToXCUnitFile(args[0], args[1])
+    transpileKotlinJUnitToXCUnitFile(args[0], args[1])
 }
 
 
-fun preprocessKotlinJUnitToXCUnitFile(sourcePath: String, destPath: String) {
+fun transpileKotlinJUnitToXCUnitFile(sourcePath: String, destPath: String) {
     val source = File(sourcePath)
     val dest   = File(destPath)
-    preprocessKotlinJUnitToXCUnitFile(source, dest)
+    transpileKotlinJUnitToXCUnitFile(source, dest)
 }
 
 
-fun preprocessKotlinJUnitToXCUnitFile(source: File, dest: File) {
-    val text = source.readText()
-    val processed = preprocessKotlinJUnitToXCUnit(text)
-    dest.writeText(processed)
+fun transpileKotlinJUnitToXCUnitFile(source: File, dest: File) {
+    val text       = source.readText()
+    val processed  = preprocess(text)
+    val transpiled = transpileKotlinToSwift(processed)
+    val final      = postprocess(transpiled)
+    dest.writeText(final)
 }
 
+
+fun postprocess(swiftSource: String): String {
+    return "import XCTest\n$swiftSource"
+}
+
+
+fun transpileKotlinToSwift(kotlinSource: String): String {
+    val sequalsk = SequalsKClient(HttpClient(CIO))
+    return sequalsk.transpile(kotlinSource)
+}
+
+
+class SequalsKClient(val client: HttpClient) {
+    fun transpile(kotlinSource: String): String {
+        var swiftSource: String? = null
+        runBlocking {
+            val response: HttpResponse = client.post("https://transpile.iem.thm.de/sek/?input=kotlin") {
+                body = kotlinSource
+            }
+            swiftSource = response.receive()
+        }
+        return swiftSource!!
+    }
+}
 
 /**
  * Returns a String which can be sent to SequalsK to produce an XCUnit test.
  */
-fun preprocessKotlinJUnitToXCUnit(kotlinSource: String): String {
+fun preprocess(kotlinSource: String): String {
     val lexer = KotlinLexer(CharStreams.fromString(kotlinSource))
     val tokens = CommonTokenStream(lexer)
     val parser = KotlinParser(tokens)
@@ -93,19 +126,15 @@ class PreprocessorListener(private val parser: KotlinParser, private val tokens:
         removeTokensStartingAtIndex(savedTokenSize)
     }
 
-//    override fun visitTerminal(p0: TerminalNode?) {
-//    }
-
-//    override fun visitErrorNode(p0: ErrorNode?) {
-//    }
-
     fun saveTokens(context: ParserRuleContext) {
         saveTokens(context, context)
     }
 
     fun saveTokens(startContext: ParserRuleContext, stopContext: ParserRuleContext) {
         for (i in startContext.start.tokenIndex..stopContext.stop.tokenIndex) {
-            outputTokens.add(tokens.get(i).text)
+            val token = tokens.get(i)
+            if (token.type != KotlinLexer.EOF)
+                outputTokens.add(token.text)
         }
     }
 
@@ -113,7 +142,6 @@ class PreprocessorListener(private val parser: KotlinParser, private val tokens:
         lastContext = p0
         lastRuleStart = outputTokens.size
         if (isPrinting() && p0 != null && p0.stop != null) {
-            println(p0.toString(parser))
             saveTokens(p0, p0)
         }
     }
@@ -200,14 +228,12 @@ class PreprocessorListener(private val parser: KotlinParser, private val tokens:
     override fun exitClassDeclaration(ctx: KotlinParser.ClassDeclarationContext?) { startPrinting() }
 
     override fun enterModifiers(ctx: KotlinParser.ModifiersContext?) {
-        println("modifiers")
         ignore()
     }
     override fun exitModifiers(ctx: KotlinParser.ModifiersContext?) { startPrinting() }
 
 
     override fun enterModifier(ctx: KotlinParser.ModifierContext?) {
-        println("modifier")
         stopPrinting()
     }
     override fun exitModifier(ctx: KotlinParser.ModifierContext?) { startPrinting() }
@@ -240,7 +266,7 @@ class PreprocessorListener(private val parser: KotlinParser, private val tokens:
             }
         }
     }
-override fun exitClassBody(ctx: KotlinParser.ClassBodyContext?) {
+    override fun exitClassBody(ctx: KotlinParser.ClassBodyContext?) {
         if (isPrinting()) {
             outputTokens.add("}")
         }
@@ -614,6 +640,5 @@ override fun exitClassBody(ctx: KotlinParser.ClassBodyContext?) {
         stopPrinting()
     }
     override fun exitAnnotation(ctx: KotlinParser.AnnotationContext?) { startPrinting() }
-
 
 }
