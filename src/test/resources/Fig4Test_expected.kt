@@ -20,4 +20,11 @@ class Fig4Test: XCTestCase {
         f.greet("Bill", "Cupertino")
         XCTAssertEqual(f.s, expected)
     }
+
+    fun testFig4GreetAbel() {
+        val f = Fig4("")
+        val expected = "Hello Abel!\nGlad you could visit from Austin."
+        f.greet("Abel", "Austin")
+        XCTAssertEqual(f.s, expected)
+    }
 }
