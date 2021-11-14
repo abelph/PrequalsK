@@ -12,7 +12,6 @@ class C2 {
 }
 
 class Fig5Test: XCTestCase {
-
     fun testFig5Value42(){
         val c = C2()
         c.x = 42
@@ -27,5 +26,4 @@ class Fig5Test: XCTestCase {
         val expected = "old: 0\nnew: 42\nold: 42\nnew: 36\n"
         XCTAssertEqual(c.s, expected)
     }
-
 }

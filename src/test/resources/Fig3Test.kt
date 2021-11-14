@@ -5,7 +5,6 @@ class C(val x: Int) {
 }
 
 class Fig3Test {
-
     @Test
     fun testFig3Value0() {
         val actual = C(0).x
@@ -23,5 +22,4 @@ class Fig3Test {
         val actual = C(2_147_483_647).x
         assertEquals(2_147_483_647, actual)
     }
-
 }
