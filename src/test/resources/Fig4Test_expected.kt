@@ -7,9 +7,6 @@ class Fig4(var s: String) {
         s += "Glad you could visit from ${hometown}."
         return s
     }
-    fun main() {
-        greet("Bill", "Cupertino")
-    }
 }
 
 class Fig4Test: XCTestCase {
@@ -21,7 +18,7 @@ class Fig4Test: XCTestCase {
         XCTAssertEqual(f.s, expected)
     }
 
-    fun testFig4GreetAbel() {
+    fun testFig4GreetAbel(){
         val f = Fig4("")
         val expected = "Hello Abel!\nGlad you could visit from Austin."
         f.greet("Abel", "Austin")

@@ -7,9 +7,6 @@ class Fig4(var s: String) {
         s += "Glad you could visit from ${hometown}."
         return s
     }
-    fun main() {
-        greet("Bill", "Cupertino")
-    }
 }
 
 class Fig4Test {
