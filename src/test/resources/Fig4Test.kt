@@ -21,4 +21,12 @@ class Fig4Test {
         f.greet("Bill", "Cupertino")
         assertEquals(expected, f.s)
     }
+
+    @Test
+    fun testFig4GreetAbel() {
+        val f = Fig4("")
+        val expected = "Hello Abel!\nGlad you could visit from Austin."
+        f.greet("Abel", "Austin")
+        assertEquals(expected, f.s)
+    }
 }

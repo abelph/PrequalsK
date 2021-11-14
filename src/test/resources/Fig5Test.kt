@@ -21,4 +21,13 @@ class Fig5Test {
         assertEquals(expected, c.s)
     }
 
+    @Test
+    fun testFig5Value42() {
+        val c = C2()
+        c.x = 42
+        c.x = 36
+        val expected = "old: 42\nnew: 36"
+        assertEquals(expected, c.s)
+    }
+
 }
